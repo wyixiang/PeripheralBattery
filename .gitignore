@@ -1,0 +1,31 @@
+**/bin/
+**/obj/
+dist/
+artifacts/
+work/
+
+# IDE and local user state
+.vs/
+.idea/
+.vscode/
+*.user
+*.suo
+*.pdb
+
+# Generated packages, diagnostics and machine-specific preferences
+*.zip
+*.log
+*.jsonl
+diagnostic.txt
+startup-error.txt
+preferences.json
+status.json
+
+# Credentials and signing material
+.env*
+auth.json
+*.vscdb*
+*.pfx
+*.p12
+*.pem
+*.key
