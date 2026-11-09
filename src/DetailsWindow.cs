@@ -1,7 +1,7 @@
 using W=System.Windows;
 using C=System.Windows.Controls;
 using M=System.Windows.Media;
-namespace MouseBattery;
+namespace PeripheralBattery;
 internal sealed class DetailsWindow : GlassWindow
 {
     readonly WidgetContext context;

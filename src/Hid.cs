@@ -2,7 +2,7 @@ using System.ComponentModel;
 using System.Runtime.InteropServices;
 using Microsoft.Win32.SafeHandles;
 
-namespace MouseBattery;
+namespace PeripheralBattery;
 
 internal sealed record HidDevice(string Path, ushort ProductId, ushort UsagePage, ushort Usage,
     ushort InputLength, ushort OutputLength, byte[] OutputIds, string Name);

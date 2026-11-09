@@ -1,4 +1,4 @@
-namespace MouseBattery;
+namespace PeripheralBattery;
 
 internal sealed record PairedMouse(ushort ProductId, byte ControlReport, byte EventReport);
 internal sealed record BatteryReading(int Percent, bool Charging, int Millivolts);

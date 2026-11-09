@@ -1,7 +1,7 @@
 using W=System.Windows;
 using C=System.Windows.Controls;
 using M=System.Windows.Media;
-namespace MouseBattery;
+namespace PeripheralBattery;
 
 // ContextMenu supplies Windows/WPF popup capture and dismissal, including when
 // the taskbar card intentionally uses WS_EX_NOACTIVATE.

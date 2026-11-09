@@ -1,4 +1,4 @@
-namespace MouseBattery;
+namespace PeripheralBattery;
 
 internal sealed record DeviceState(string Name, ushort ProductId, BatteryReading Power, DateTimeOffset UpdatedAt, string Source="ROG OMNI 接收器");
 internal static class BatteryReader

@@ -2,7 +2,7 @@ using System.Diagnostics;
 using System.Text.Json;
 using System.Windows.Threading;
 using Microsoft.Win32;
-namespace MouseBattery;
+namespace PeripheralBattery;
 
 internal sealed class WidgetContext : IDisposable
 {
@@ -40,7 +40,7 @@ internal sealed class WidgetContext : IDisposable
         tray.MouseClick+=(_,e)=> { if(e.Button==MouseButtons.Right) ShowMenu(); else if(e.Button==MouseButtons.Left) ShowDetails(); };
         foreach(var name in new[]{"Show","Menu","Exit"})
         {
-            var signal=new EventWaitHandle(false,EventResetMode.AutoReset,@"Local\MouseBattery."+name); events.Add(signal);
+            var signal=new EventWaitHandle(false,EventResetMode.AutoReset,@"Local\PeripheralBattery."+name); events.Add(signal);
             waits.Add(ThreadPool.RegisterWaitForSingleObject(signal,(_,_)=>System.Windows.Application.Current.Dispatcher.BeginInvoke(new Action(()=> { if(disposed) return; if(name=="Exit") Quit(); else if(name=="Menu") ShowMenu(); else ShowDetails(); })),null,-1,false));
         }
         SystemEvents.DisplaySettingsChanged+=DisplaysChanged;
@@ -140,7 +140,7 @@ internal sealed class WidgetContext : IDisposable
     internal static void OpenGearLink()=>Process.Start(new ProcessStartInfo("https://gearlink.asus.com/zh-cn") { UseShellExecute=true });
     internal bool Autostart
     {
-        get { using var key=Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run"); return key?.GetValue("MouseBattery") is string value && value.Contains(Environment.ProcessPath!,StringComparison.OrdinalIgnoreCase); }
+        get { using var key=Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run"); return key?.GetValue("PeripheralBattery") is string value && value.Contains(Environment.ProcessPath!,StringComparison.OrdinalIgnoreCase); }
     }
     internal void ToggleAutostart()
     {
@@ -148,9 +148,9 @@ internal sealed class WidgetContext : IDisposable
         {
             bool enabled=Autostart;
             using var key=Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run");
-            if(enabled) key.DeleteValue("MouseBattery",false); else key.SetValue("MouseBattery","\""+Environment.ProcessPath+"\"");
+            if(enabled) key.DeleteValue("PeripheralBattery",false); else key.SetValue("PeripheralBattery","\""+Environment.ProcessPath+"\"");
         }
-        catch(Exception e) { System.Windows.MessageBox.Show("无法修改开机启动："+e.Message,"鼠标电量"); }
+        catch(Exception e) { System.Windows.MessageBox.Show("无法修改开机启动："+e.Message,"外设电量"); }
     }
     internal void Quit() { if(disposed) return; Dispose(); System.Windows.Application.Current.Shutdown(); }
     internal static void Log(Exception e)

@@ -4,6 +4,6 @@
     <UseWindowsForms>true</UseWindowsForms><UseWPF>true</UseWPF>
     <Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier><PlatformTarget>x64</PlatformTarget>
-    <Version>1.1.2</Version><AssemblyName>MouseBattery</AssemblyName>
+    <Version>1.2.0</Version><AssemblyName>PeripheralBattery</AssemblyName>
   </PropertyGroup>
 </Project>

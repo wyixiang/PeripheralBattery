@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
-namespace MouseBattery;
+namespace PeripheralBattery;
 
 internal sealed record DisplayEntry(Screen Screen, string Name, string? Identity)
 {

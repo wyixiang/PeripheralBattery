@@ -1,4 +1,4 @@
-namespace MouseBattery;
+namespace PeripheralBattery;
 internal sealed record MonitorCandidate(string DeviceName, string? Identity, bool Primary);
 internal sealed class MonitorSelection
 {

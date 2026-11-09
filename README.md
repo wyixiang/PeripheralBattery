@@ -1,4 +1,4 @@
-# MouseBattery · Windows 11 外设电量工具
+# PeripheralBattery · Windows 11 外设电量工具
 
 在任务栏上横向显示鼠标和键盘的电量，不用一直开着设备驱动网页。
 
@@ -6,7 +6,7 @@
 鼠标  88%  ━━━━━━━━    │    键盘·充电  79%  ━━━━━━━
 ```
 
-当前版本：**1.1.2**。界面使用 WPF、Win32 和系统托盘，源码没有第三方 NuGet 依赖。
+当前版本：**1.2.0**。界面使用 WPF、Win32 和系统托盘，源码没有第三方 NuGet 依赖。
 
 ## 功能
 
@@ -38,7 +38,7 @@
 构建后启动：
 
 ```powershell
-.\dist\MouseBattery.exe
+.\dist\PeripheralBattery.exe
 ```
 
 保留同目录中的 DLL 和 JSON 文件。单击卡片或托盘打开详情，右键打开设置菜单。托盘数字沿用鼠标电量，悬停提示同时列出两台设备。
@@ -73,7 +73,7 @@ artifacts/、work/     本地构建、备份和排查文件，已排除 Git
 
 ## 设置与诊断
 
-个人设置和运行状态保存在 `%LOCALAPPDATA%\MouseBattery`：
+个人设置和运行状态保存在 `%LOCALAPPDATA%\PeripheralBattery`：
 
 | 文件 | 用途 |
 | --- | --- |
@@ -81,7 +81,7 @@ artifacts/、work/     本地构建、备份和排查文件，已排除 Git
 | `status.json` | 两台设备的最新读取状态和错误 |
 | `error.log` | 读取失败记录，自动限制大小 |
 
-更换程序位置后，如已启用登录启动，请在新位置关闭、重新开启一次该选项。
+旧版 MouseBattery 的个人设置会在首次启动时导入。更换程序位置后，如已启用登录启动，请在新位置关闭、重新开启一次该选项。
 
 | 参数 | 行为 |
 | --- | --- |

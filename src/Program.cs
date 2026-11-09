@@ -1,5 +1,5 @@
 using System.Text.Json;
-namespace MouseBattery;
+namespace PeripheralBattery;
 internal static class Program
 {
     [STAThread] static void Main(string[] args)
@@ -52,7 +52,7 @@ internal static class Program
         Application.EnableVisualStyles();
         var command=args.Contains("--exit")?"Exit":args.Contains("--menu")?"Menu":"Show";
         if(args.Contains("--exit")) { Signal(command); return; }
-        using var mutex=new Mutex(true,@"Local\MouseBattery.Personal",out var first);
+        using var mutex=new Mutex(true,@"Local\PeripheralBattery.Personal",out var first);
         if(!first) { Signal(command); return; }
         var app=new System.Windows.Application { ShutdownMode=System.Windows.ShutdownMode.OnExplicitShutdown };
         app.DispatcherUnhandledException+=(_,e)=>WidgetContext.Log(e.Exception);
@@ -62,7 +62,7 @@ internal static class Program
     }
     static void Signal(string name)
     {
-        try { using var handle=EventWaitHandle.OpenExisting(@"Local\MouseBattery."+name); handle.Set(); }
+        try { using var handle=EventWaitHandle.OpenExisting(@"Local\PeripheralBattery."+name); handle.Set(); }
         catch(WaitHandleCannotBeOpenedException) { }
     }
 }

@@ -1,4 +1,4 @@
-namespace MouseBattery;
+namespace PeripheralBattery;
 
 internal static class CherryReader
 {

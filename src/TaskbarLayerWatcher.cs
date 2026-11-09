@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Windows.Threading;
-namespace MouseBattery;
+namespace PeripheralBattery;
 
 // Explorer can move its topmost taskbar above the card during activation or
 // taskbar-button removal. Restore the card on that event, not a second later.

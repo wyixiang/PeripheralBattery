@@ -1,5 +1,5 @@
 using System.Runtime.InteropServices;
-namespace MouseBattery;
+namespace PeripheralBattery;
 internal static class Native
 {
     [StructLayout(LayoutKind.Sequential)] internal struct Rect { public int Left,Top,Right,Bottom; }

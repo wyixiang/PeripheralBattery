@@ -4,7 +4,7 @@ using M=System.Windows.Media;
 using I=System.Windows.Input;
 using H=System.Windows.Interop;
 
-namespace MouseBattery;
+namespace PeripheralBattery;
 internal sealed class DockWindow : GlassWindow
 {
     readonly WidgetContext context;

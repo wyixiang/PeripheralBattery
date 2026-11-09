@@ -1,4 +1,4 @@
-using MouseBattery;
+using PeripheralBattery;
 int checks=0;
 void Check(bool condition,string name) { if(!condition) throw new Exception(name); checks++; }
 void Reject(Action action,string name) { try { action(); } catch(InvalidDataException) { checks++; return; } throw new Exception("Accepted invalid data: "+name); }

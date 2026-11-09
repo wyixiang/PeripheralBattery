@@ -5,7 +5,7 @@ using M = System.Windows.Media;
 using H = System.Windows.Interop;
 using S = System.Windows.Shell;
 
-namespace MouseBattery;
+namespace PeripheralBattery;
 
 internal sealed class Palette(bool dark)
 {
