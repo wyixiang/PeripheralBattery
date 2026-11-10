@@ -14,8 +14,9 @@ internal sealed class DockWindow : GlassWindow
     bool dragged;
     internal string? MonitorDevice { get; private set; }
     internal bool CanRestore => !context.IsQuitting && CanUse;
-    internal IntPtr Handle => new H.WindowInteropHelper(this).EnsureHandle();
-    internal Rectangle Bounds => Native.GetWindowRect(Handle,out var r)?Rectangle.FromLTRB(r.Left,r.Top,r.Right,r.Bottom):Rectangle.Empty;
+    // Never create/recreate a handle from a timer, delayed restore or after Close.
+    internal IntPtr Handle => CanRestore?new H.WindowInteropHelper(this).Handle:IntPtr.Zero;
+    internal Rectangle Bounds => Handle is var handle && handle!=IntPtr.Zero && Native.GetWindowRect(handle,out var r)?Rectangle.FromLTRB(r.Left,r.Top,r.Right,r.Bottom):Rectangle.Empty;
     internal DockWindow(WidgetContext context):base(context.IsDark)
     {
         this.context=context;
@@ -40,18 +41,30 @@ internal sealed class DockWindow : GlassWindow
         };
         LostMouseCapture+=(_,_)=>press=null;
         Closed+=(_,_)=>Program.History?.CardState(context.IsQuitting?"closed-during-exit":"closed-unexpectedly");
-        MouseRightButtonUp+=(_,e)=> { Dispatcher.BeginInvoke(new Action(context.ShowMenu),System.Windows.Threading.DispatcherPriority.Input); e.Handled=true; };
+        MouseRightButtonUp+=(_,e)=> { UiDispatch.Post(Dispatcher,()=>CanRestore,context.ShowMenu,System.Windows.Threading.DispatcherPriority.Input); e.Handled=true; };
         Repaint();
     }
-    internal void PrepareForReconnect()=>monitor.BeginReconnect(DateTimeOffset.UtcNow);
+    protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+    {
+        if(!context.IsQuitting) e.Cancel=true;
+        base.OnClosing(e);
+        if(!context.IsQuitting)
+        {
+            e.Cancel=true; IsClosing=false;
+            Program.History?.Note("card-close-prevented","常驻卡片只在明确退出时销毁");
+        }
+    }
+    internal void PrepareForReconnect() { if(CanRestore) monitor.BeginReconnect(DateTimeOffset.UtcNow); }
     internal void RestoreTopmost()
     {
-        if(!context.Settings.Visible || !IsVisible || context.IsQuitting) return;
+        if(!CanRestore || !context.Settings.Visible || !IsVisible) return;
+        var handle=Handle; if(handle==IntPtr.Zero) return;
         // Keep position/size and keyboard focus; don't move the hidden WPF owner.
-        Native.SetWindowPos(Handle,new IntPtr(-1),0,0,0,0,0x0253);
+        Native.SetWindowPos(handle,new IntPtr(-1),0,0,0,0,0x0253);
     }
     internal void Repaint()
     {
+        if(!CanRestore) return;
         var p=new Palette(context.IsDark); UpdateBackdrop(context.IsDark);
         Surface.Background=Palette.Brush(context.IsDark?"#C8262C33":"#C8F8FAFC"); Surface.BorderBrush=p.Stroke;
         var grid=new C.Grid { Margin=new W.Thickness(11,4,11,4),Cursor=I.Cursors.Hand };
@@ -106,6 +119,7 @@ internal sealed class DockWindow : GlassWindow
     }
     internal void DockToTaskbar()
     {
+        if(!CanRestore) return;
         if(!context.Settings.Visible) { Program.History?.CardState("hidden-by-user-setting"); Hide(); return; }
         var displays=DisplayCatalog.Read();
         var selected=monitor.Resolve(displays.Select(d=>new MonitorCandidate(d.DeviceName,d.Identity,d.Screen.Primary)).ToArray(),context.Settings.MonitorIdentity,context.Settings.MonitorDevice,DateTimeOffset.UtcNow);
@@ -120,15 +134,16 @@ internal sealed class DockWindow : GlassWindow
         var scale=Math.Max(96,Native.GetDpiForWindow(taskbar))/96.0;
         int width=(int)Math.Round(320*scale),height=Math.Min((int)Math.Round(40*scale),r.Bottom-r.Top-4);
         if(height<20 || r.Top>=screen.Bottom-3 || r.Bottom<=screen.Top+3) { Program.History?.CardState("taskbar-hidden-or-too-small"); Hide(); return; }
-        if(Native.IsFullscreenForeground(screen,Handle)) { Program.History?.CardState("hidden-for-fullscreen"); Hide(); return; }
+        var handle=Handle; if(handle==IntPtr.Zero) return;
+        if(Native.IsFullscreenForeground(screen,handle)) { Program.History?.CardState("hidden-for-fullscreen"); Hide(); return; }
         // Sit immediately to the left of the AI widget when it is on the same taskbar.
         int anchor=(int)Math.Round((r.Right-r.Left)*.16)-width-(int)Math.Round(8*scale);
         var ai=Native.FindWindow(null!,"Codex 任务栏额度");
         if(ai!=IntPtr.Zero && Native.GetWindowRect(ai,out var a) && a.Top>=r.Top && a.Bottom<=r.Bottom) anchor=a.Left-r.Left-width-(int)Math.Round(8*scale);
         int x=r.Left+Math.Clamp(anchor+(int)Math.Round(context.Settings.Offset*scale),8,Math.Max(8,r.Right-r.Left-width-(int)Math.Round(96*scale)));
         int y=r.Top+(r.Bottom-r.Top-height)/2;
-        Native.SetWindowPos(Handle,new IntPtr(-1),x,y,width,height,0x0250);
-        if(!IsVisible) Show();
+        Native.SetWindowPos(handle,new IntPtr(-1),x,y,width,height,0x0250);
+        if(!IsVisible && CanRestore) Show();
         Program.History?.CardState("visible");
     }
 }

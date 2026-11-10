@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net9.0-windows</TargetFramework><UseWPF>true</UseWPF><UseWindowsForms>true</UseWindowsForms><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../src/DockWindow.cs" Link="DockWindow.cs" />
+    <Compile Include="../../src/DetailsWindow.cs" Link="DetailsWindow.cs" />
+    <Compile Include="../../src/ModernSurface.cs" Link="ModernSurface.cs" />
+    <Compile Include="../../src/UiDispatch.cs" Link="UiDispatch.cs" />
+    <Compile Include="../../src/TaskbarLayerWatcher.cs" Link="TaskbarLayerWatcher.cs" />
+    <Compile Include="../../src/Native.cs" Link="Native.cs" />
+    <Compile Include="../../src/MonitorSelection.cs" Link="MonitorSelection.cs" />
+    <Compile Include="../../src/DisplayCatalog.cs" Link="DisplayCatalog.cs" />
+    <Compile Include="../../src/DeviceState.cs" Link="DeviceState.cs" />
+    <Compile Include="../../src/BatteryProtocol.cs" Link="BatteryProtocol.cs" />
+    <Compile Include="../../src/UsbPowerIcon.cs" Link="UsbPowerIcon.cs" />
+    <Resource Include="../../src/app.ico" Link="app.ico" />
+  </ItemGroup>
+</Project>

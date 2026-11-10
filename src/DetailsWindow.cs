@@ -10,15 +10,16 @@ internal sealed class DetailsWindow : GlassWindow
         this.context=context; Title="外设电量详情"; Width=360; SizeToContent=W.SizeToContent.Height; ShowInTaskbar=context.InspectUi;
         WindowStartupLocation=W.WindowStartupLocation.CenterScreen;
         MouseLeftButtonDown+=(_,e)=> { if(e.OriginalSource is C.TextBlock or C.Border) try { DragMove(); } catch(InvalidOperationException) { } };
-        Deactivated+=(_,_)=>Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background,new Action(()=>
+        Deactivated+=(_,_)=>UiDispatch.Post(Dispatcher,()=>!context.IsQuitting && CanUse,()=>
         {
             // Deactivation can arrive before a minimize finishes. Let the state
             // settle, then dismiss only a visible, inactive normal window.
             if(!context.IsQuitting && !IsDisposed && !IsClosing && IsVisible && !IsActive && WindowState==W.WindowState.Normal) Dismiss();
-        }));
+        },System.Windows.Threading.DispatcherPriority.Background);
         Repaint();
         ContentRendered+=(_,_)=>
         {
+            if(context.IsQuitting || !CanUse) return;
             var bounds=context.Dock.Bounds;
             if(bounds.IsEmpty) return;
             var dpi=Math.Max(96,Native.GetDpiForWindow(new System.Windows.Interop.WindowInteropHelper(this).Handle))/96.0;
@@ -29,17 +30,20 @@ internal sealed class DetailsWindow : GlassWindow
     }
     protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
     {
-        if(!context.IsQuitting) { e.Cancel=true; Dismiss(); }
+        if(!context.IsQuitting) e.Cancel=true;
         base.OnClosing(e);
+        if(!context.IsQuitting) { e.Cancel=true; IsClosing=false; Dismiss(); }
     }
     void Dismiss()
     {
+        if(context.IsQuitting || !CanUse) return;
         Program.History?.Note("details-hidden","收起详情，后台继续运行");
         Hide();
         context.Dock.RestoreTopmost();
     }
     internal void Repaint()
     {
+        if(context.IsQuitting || !CanUse) return;
         var p=new Palette(context.IsDark); UpdateBackdrop(context.IsDark);
         Surface.Background=Palette.Brush(context.IsDark?"#ED25292E":"#EDF8FAFC"); Surface.BorderBrush=p.Stroke;
         var stack=new C.StackPanel { Margin=new W.Thickness(20,12,20,18) }; Surface.Child=stack;

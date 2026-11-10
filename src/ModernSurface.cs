@@ -22,7 +22,7 @@ internal class GlassWindow : W.Window
 {
     private bool _dark;
     internal bool IsDisposed { get; private set; }
-    internal bool IsClosing { get; private set; }
+    internal bool IsClosing { get; private protected set; }
     internal bool CanUse => !IsDisposed && !IsClosing && UiDispatch.Available(Dispatcher);
     internal bool AcrylicApplied { get; private set; }
     internal readonly Palette Colors;
@@ -63,15 +63,18 @@ internal class GlassWindow : W.Window
     }
     protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
     {
+        IsClosing = true;
         base.OnClosing(e); IsClosing = !e.Cancel;
     }
     internal void UpdateBackdrop(bool dark)
     {
+        if (!CanUse) return;
         if (_dark == dark) return;
         _dark = dark; if (W.PresentationSource.FromVisual(this) is not null) ApplyBackdrop();
     }
     private void ApplyBackdrop()
     {
+        if (!CanUse) return;
         var handle = new H.WindowInteropHelper(this).Handle;
         var source = H.HwndSource.FromHwnd(handle);
         if (source?.CompositionTarget is { } target) target.BackgroundColor = M.Colors.Transparent;

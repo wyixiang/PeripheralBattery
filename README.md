@@ -6,7 +6,7 @@
 鼠标  88%  ━━━━━━━━    │    键盘·充电  79%  ━━━━━━━
 ```
 
-当前版本：**1.3.3**。界面使用 WPF、Win32 和系统托盘，源码没有第三方 NuGet 依赖。
+当前版本：**1.3.4**。界面使用 WPF、Win32 和系统托盘，源码没有第三方 NuGet 依赖。
 
 ## 功能
 
@@ -57,6 +57,10 @@
 # 61 项协议、设备状态及运行日志检查，不访问硬件。
 dotnet run --project tests/ProtocolChecks.csproj -c Release
 
+# 16 项隔离 STA/WPF 窗口生命周期检查（Windows）。
+# 使用生产窗口与调度代码、内存配置，不访问设备或运行实例的 IPC/设置。
+dotnet run --project tests/windows/WindowChecks.csproj -c Release
+
 # 发布到 dist/。更新前请先通过菜单退出正在运行的版本。
 .\build.ps1
 
@@ -101,6 +105,8 @@ artifacts/、work/     本地构建、备份和排查文件，已排除 Git
 异常记录只保留类型、HResult、有限的代码调用栈和内部异常类型；不记录任意异常消息、Data、URL、源文件路径或服务载荷。升级前的旧日志仍按原样保留在本机；旧格式异常文本不会重新抄入新版会话快照。
 
 强制结束、断电或部分原生崩溃可能来不及写日志；下次启动会记录 `previous-run-incomplete`，保留最后心跳与状态，并明确标为原因未确认；已留下异常结束记录时使用 `previous-run-abnormal`。日志不能追溯旧版本未记录的退出原因，也不会把设备休眠当成程序退出。所有诊断只存本机，不自动上传。
+
+1.3.4 的窗口关闭复现与修复验证见 [生命周期验证](docs/lifecycle-validation.md)。
 
 | 参数 | 行为 |
 | --- | --- |
