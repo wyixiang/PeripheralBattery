@@ -36,7 +36,7 @@ internal sealed class WidgetContext : IDisposable
             if(disposed) return;
             try { Dock.DockToTaskbar(); } catch(Exception e) { Log(e); }
         });
-        tray=new NotifyIcon { Visible=true,Text="外设电量 · 正在读取",Icon=SystemIcons.Information };
+        tray=new NotifyIcon { Visible=true,Text="外设电量 · 正在读取",Icon=TrayIconRenderer.Create(null,false,IsDark) };
         tray.MouseClick+=(_,e)=> { if(e.Button==MouseButtons.Right) ShowMenu(); else if(e.Button==MouseButtons.Left) ShowDetails(); };
         foreach(var name in new[]{"Show","Menu","Exit"})
         {
@@ -105,22 +105,17 @@ internal sealed class WidgetContext : IDisposable
         Dock.Repaint();
         if(details is { IsDisposed:false }) details.Repaint();
         string Summary(string label,DeviceState? state,string? error)=>error is not null?$"{label} —":state is not null?$"{label} {state.Power.Percent}%"+(state.Power.Charging?"（充电中）":""):$"{label} 读取中";
-        var tooltip=Summary("鼠标",State,Error)+" · "+Summary("键盘",KeyboardState,KeyboardError);
+        var tooltip=Summary("鼠标",State,Error)+" · "+Summary("键盘",KeyboardState,KeyboardError)+"\n电池图标：鼠标电量";
         tray.Text=tooltip[..Math.Min(63,tooltip.Length)];
-        var iconKey=(Error is null && State is { } current?current.Power.Percent:-1)+(IsDark?1000:0);
+        bool live=Error is null && State is not null;
+        int? percent=live?State!.Power?.Percent:null;
+        bool charging=live && State!.Power?.Charging==true;
+        var iconKey=(percent??-1)+(charging?200:0)+(IsDark?1000:0);
         if(lastIcon!=iconKey)
         {
             lastIcon=iconKey;
-            using var bitmap=new Bitmap(32,32);
-            using var graphics=Graphics.FromImage(bitmap);
-            graphics.TextRenderingHint=System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
-            using var font=new Font("Segoe UI",State?.Power.Percent==100?13:16,FontStyle.Bold,GraphicsUnit.Pixel);
-            using var brush=new SolidBrush(Error is null && State?.Power.Percent<=20?Color.OrangeRed:IsDark?Color.White:Color.FromArgb(24,36,46));
-            var text=Error is null && State is { } s3?s3.Power.Percent.ToString():"?";
-            graphics.DrawString(text,font,brush,new RectangleF(0,0,32,32),new StringFormat { Alignment=StringAlignment.Center,LineAlignment=StringAlignment.Center });
-            var handle=bitmap.GetHicon();
-            try { using var icon=Icon.FromHandle(handle); var previous=tray.Icon; tray.Icon=(Icon)icon.Clone(); if(previous!=SystemIcons.Information) previous?.Dispose(); }
-            finally { DestroyIcon(handle); }
+            var icon=TrayIconRenderer.Create(percent,charging,IsDark);
+            var previous=tray.Icon; tray.Icon=icon; previous?.Dispose();
         }
     }
     internal void ShowDetails()
@@ -172,10 +167,9 @@ internal sealed class WidgetContext : IDisposable
         SystemEvents.DisplaySettingsChanged-=DisplaysChanged; SystemEvents.PowerModeChanged-=PowerChanged;
         foreach(var wait in waits) wait.Unregister(null);
         foreach(var signal in events) signal.Dispose();
-        var icon=tray.Icon; tray.Visible=false; tray.Dispose(); if(icon!=SystemIcons.Information) icon?.Dispose();
+        var icon=tray.Icon; tray.Visible=false; tray.Dispose(); icon?.Dispose();
         if(menu is not null) menu.IsOpen=false;
         if(details is { IsDisposed:false }) details.Close();
         Dock.Close();
     }
-    [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool DestroyIcon(IntPtr icon);
 }

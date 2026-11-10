@@ -7,7 +7,7 @@ internal sealed class DetailsWindow : GlassWindow
     readonly WidgetContext context;
     internal DetailsWindow(WidgetContext context):base(context.IsDark)
     {
-        this.context=context; Title="外设电量详情"; Width=360; SizeToContent=W.SizeToContent.Height; ShowInTaskbar=true;
+        this.context=context; Title="外设电量详情"; Width=360; SizeToContent=W.SizeToContent.Height; ShowInTaskbar=context.InspectUi;
         WindowStartupLocation=W.WindowStartupLocation.CenterScreen;
         MouseLeftButtonDown+=(_,e)=> { if(e.OriginalSource is C.TextBlock or C.Border) try { DragMove(); } catch(InvalidOperationException) { } };
         Deactivated+=(_,_)=>Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background,new Action(()=>
@@ -50,7 +50,7 @@ internal sealed class DetailsWindow : GlassWindow
             button.Content=new C.TextBlock { Text=text,FontSize=18,HorizontalAlignment=W.HorizontalAlignment.Center,VerticalAlignment=W.VerticalAlignment.Center }; button.HorizontalAlignment=W.HorizontalAlignment.Right;
             W.Automation.AutomationProperties.SetName(button,name); return button;
         }
-        header.Children.Add(WindowButton("−","最小化",()=>WindowState=W.WindowState.Minimized,32));
+        header.Children.Add(WindowButton("−","收起到托盘",Dismiss,32));
         header.Children.Add(WindowButton("×","关闭详情",Close,0));
         void Device(string label,string fallback,DeviceState? state,string? error)
         {

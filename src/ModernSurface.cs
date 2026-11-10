@@ -58,8 +58,7 @@ internal class GlassWindow : W.Window
         SourceInitialized += (_, _) => ApplyBackdrop();
         PreviewKeyDown += (_, e) => { if (this is not DockWindow && e.Key == System.Windows.Input.Key.Escape) { Close(); e.Handled = true; } };
         Closed += (_, _) => IsDisposed = true;
-
-
+        Icon = System.Windows.Media.Imaging.BitmapFrame.Create(new Uri("pack://application:,,,/app.ico"));
     }
     protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
     {
