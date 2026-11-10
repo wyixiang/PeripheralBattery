@@ -34,4 +34,17 @@ cherryResponse[3]=0x1a; Reject(()=>CherryProtocol.ParsePower(cherryResponse[..12
 cherryResponse[7]=255;
 try { CherryProtocol.ParsePower(cherryResponse); throw new Exception("Accepted CHERRY device error"); } catch(IOException) { checks++; }
 Check(!CherryProtocol.IsPowerResponse(Convert.FromHexString("143F3F000000000000000000000000000000000000")),"unrelated feature report is not battery data");
-Console.WriteLine($"PASS: {checks} protocol checks");
+Check(CherryDeviceSupport.IsWiredMx100(0x00bb,1,6),"actual MX 10.0 USB keyboard collection");
+Check(!CherryDeviceSupport.IsWiredMx100(0x01ef,1,6),"MX 10.1 must not be classified as batteryless");
+Check(!CherryDeviceSupport.IsWiredMx100(0x00bb,1,2),"mouse collection is not a wired keyboard");
+Check(!CherryDeviceSupport.IsMx101BatteryInterface(0x00bb,0xff1c,0x92,64,64),"never send MX 10.1 power request to MX 10.0 despite identical vendor caps");
+Check(CherryDeviceSupport.IsMx101BatteryInterface(0x01ef,0xff1c,0x92,64,64),"keep verified MX 10.1 battery interface");
+Check(!CherryDeviceSupport.IsMx101BatteryInterface(0x01ef,1,6,64,64),"never query keyboard input collection");
+Check(!CherryDeviceSupport.IsMx101BatteryInterface(0x01ef,0xff1c,0x92,64,32),"reject incompatible report size");
+Check(!CherryDeviceSupport.IsMx101BatteryInterface(0xffff,0xff1c,0x92,64,64),"unknown model must not receive power command");
+var wired=new DeviceState("CHERRY MX 10.0 RGB",0x00bb,null,DateTimeOffset.Now,"USB 有线连接（无需电池）");
+Check(wired.IsWired && wired.Power is null && wired.ValueText=="有线" && wired.ConnectionText=="USB 供电","wired status carries no fabricated percentage");
+var wireless=new DeviceState("CHERRY MX 10.1",0x01ef,new BatteryReading(78,true,0),DateTimeOffset.Now,"CHERRY HID 设备接口");
+Check(!wireless.IsWired && wireless.ValueText=="78%" && wireless.ConnectionText=="正在充电","wireless percentage and charging preserved");
+Check((wireless with { Power=new BatteryReading(0,false,0) }).ValueText=="0%","empty battery must not become wired");
+Console.WriteLine($"PASS: {checks} protocol and device-state checks");

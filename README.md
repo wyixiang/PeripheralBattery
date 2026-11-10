@@ -1,16 +1,17 @@
 # PeripheralBattery · Windows 11 外设电量工具
 
-在任务栏上横向显示鼠标和键盘的电量，不用一直开着设备驱动网页。
+在任务栏上横向显示鼠标和键盘的电量或有线供电状态，不用一直开着设备驱动网页。
 
 ```text
 鼠标  88%  ━━━━━━━━    │    键盘·充电  79%  ━━━━━━━
 ```
 
-当前版本：**1.2.4**。界面使用 WPF、Win32 和系统托盘，源码没有第三方 NuGet 依赖。
+当前版本：**1.3.1**。界面使用 WPF、Win32 和系统托盘，源码没有第三方 NuGet 依赖。
 
 ## 功能
 
 - 鼠标、键盘横向并排，18 DIP 大字号百分比，各自保留电量条；低于或等于 20% 时显示橙色。
+- CHERRY MX 10.0 RGB 有线款以细线 USB 插头图标表示供电状态，悬停或详情显示“USB 供电”；图标适配明暗主题，不显示虚构电量或电量条。
 - 每 30 秒自动刷新，也可手动刷新；两台设备分别查询和处理错误。
 - 点击卡片打开详情，查看设备型号、充电状态、数据来源及更新时间。点击窗口外自动收起，卡片继续显示。
 - 支持拖动、锁定位置、多屏选择，以及浅色／深色／跟随系统。
@@ -27,8 +28,9 @@
 | --- | --- |
 | ROG 月刃2 RGB / KERIS II ORIGIN | ROG OMNI RECEIVER：`0B05:1ACE`，配对 PID `1C0E` |
 | CHERRY MX 10.1 | USB 接口：`046A:01EF`，厂商自定义 HID 集合 |
+| CHERRY MX 10.0 RGB | USB 有线：`046A:00BB`，只检测连接，无需电池 |
 
-电量通过本地 HID 查询，不要求 Gear Link 网页或 CHERRY Utility 持续运行。其他 CHERRY 型号、蓝牙直连、其他 ASUS 接收器与 ASUS 有线直连尚未验证或实现。
+电量通过本地 HID 查询，不要求 Gear Link 网页或 CHERRY Utility 持续运行。MX 10.0 仅枚举设备，不发送 MX 10.1 的电量命令。两款 CHERRY 同时连接时优先显示 MX 10.0。其他 CHERRY 型号、蓝牙直连、其他 ASUS 接收器与 ASUS 有线直连尚未验证或实现。
 
 查询协议与实际兼容范围见 [设备协议说明](docs/protocols.md)。程序只查询状态，不修改设备配置。
 
@@ -51,7 +53,7 @@
 安装 .NET 9 SDK，在仓库根目录运行：
 
 ```powershell
-# 26 项纯协议解析检查，不访问硬件。
+# 37 项协议及设备状态检查，不访问硬件。
 dotnet run --project tests/ProtocolChecks.csproj -c Release
 
 # 发布到 dist/。更新前请先通过菜单退出正在运行的版本。
@@ -65,7 +67,7 @@ dotnet run --project tests/ProtocolChecks.csproj -c Release
 
 ```text
 src/                 应用界面、窗口定位与设备读取器
-tests/               纯协议解析检查
+tests/               协议解析、设备识别及供电状态检查
 docs/protocols.md    已验证的设备协议
 build.ps1            Windows x64 发布入口
 dist/                本地运行文件，已排除 Git
@@ -83,6 +85,8 @@ artifacts/、work/     本地构建、备份和排查文件，已排除 Git
 | `error.log` | 读取失败记录，自动限制大小 |
 
 旧版 MouseBattery 的个人设置会在首次启动时导入。更换程序位置后，如已启用登录启动，请在新位置关闭、重新开启一次该选项。
+
+成功状态中的 `Power: null` 和 `IsWired: true` 表示已识别的 USB 供电设备，无电池；读取失败仍由各自的错误字段表示，不会转换为 0%。
 
 | 参数 | 行为 |
 | --- | --- |

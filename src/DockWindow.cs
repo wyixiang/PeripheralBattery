@@ -59,7 +59,7 @@ internal sealed class DockWindow : GlassWindow
         {
             bool live=state is not null && error is null;
             var power=state?.Power;
-            var accent=live?power!.Percent<=20?Palette.Brush("#D57832"):p.Accent:p.Muted;
+            var accent=live?power?.Percent<=20?Palette.Brush("#D57832"):p.Accent:p.Muted;
             var section=new C.Grid(); section.ColumnDefinitions.Add(new C.ColumnDefinition { Width=new W.GridLength(24) }); section.ColumnDefinitions.Add(new C.ColumnDefinition());
             C.Grid.SetColumn(section,column); grid.Children.Add(section);
             W.FrameworkElement symbol;
@@ -77,11 +77,21 @@ internal sealed class DockWindow : GlassWindow
             var body=new C.Grid(); C.Grid.SetColumn(body,1); section.Children.Add(body);
             body.RowDefinitions.Add(new C.RowDefinition { Height=new W.GridLength(22) }); body.RowDefinitions.Add(new C.RowDefinition { Height=new W.GridLength(4) });
             var row=new C.Grid(); body.Children.Add(row);
-            row.Children.Add(new C.TextBlock { Text=live && power!.Charging?label+"·充电":label,FontSize=11,Foreground=p.Muted,VerticalAlignment=W.VerticalAlignment.Center });
-            row.Children.Add(new C.TextBlock { Text=live?$"{power!.Percent}%":"—",FontFamily=new M.FontFamily("Segoe UI"),FontSize=18,FontWeight=W.FontWeights.SemiBold,Foreground=live?p.Text:p.Muted,HorizontalAlignment=W.HorizontalAlignment.Right,VerticalAlignment=W.VerticalAlignment.Center });
-            var track=new C.Border { Background=p.Stroke,CornerRadius=new W.CornerRadius(2) }; C.Grid.SetRow(track,1); body.Children.Add(track);
-            track.Child=new C.Border { Background=accent,CornerRadius=new W.CornerRadius(2),Width=live?112*power!.Percent/100.0:0,HorizontalAlignment=W.HorizontalAlignment.Left };
-            string description=live?$"{state!.Name} · {power!.Percent}% · {(power.Charging?"充电中":"已连接")}\n更新于 {state.UpdatedAt:HH:mm:ss}":$"{state?.Name??label} · {error??"正在读取…"}";
+            row.Children.Add(new C.TextBlock { Text=live && power?.Charging==true?label+"·充电":label,FontSize=11,Foreground=p.Muted,VerticalAlignment=W.VerticalAlignment.Center });
+            if(live && state!.IsWired)
+            {
+                var plug=UsbPowerIcon.Create(p.Text,22);
+                plug.HorizontalAlignment=W.HorizontalAlignment.Right;
+                row.Children.Add(plug);
+            }
+            else
+                row.Children.Add(new C.TextBlock { Text=live?state!.ValueText:"—",FontFamily=new M.FontFamily("Segoe UI"),FontSize=18,FontWeight=W.FontWeights.SemiBold,Foreground=live?p.Text:p.Muted,HorizontalAlignment=W.HorizontalAlignment.Right,VerticalAlignment=W.VerticalAlignment.Center });
+            if(state?.IsWired!=true)
+            {
+                var track=new C.Border { Background=p.Stroke,CornerRadius=new W.CornerRadius(2) }; C.Grid.SetRow(track,1); body.Children.Add(track);
+                track.Child=new C.Border { Background=accent,CornerRadius=new W.CornerRadius(2),Width=live && power is not null?112*power.Percent/100.0:0,HorizontalAlignment=W.HorizontalAlignment.Left };
+            }
+            string description=live?$"{state!.Name} · {state.ValueText} · {state.ConnectionText}\n更新于 {state.UpdatedAt:HH:mm:ss}":$"{state?.Name??label} · {error??"正在读取…"}";
             tooltips.Add(description);
         }
         Device(0,"鼠标",context.State,context.Error,false);

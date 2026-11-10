@@ -104,7 +104,7 @@ internal sealed class WidgetContext : IDisposable
     {
         Dock.Repaint();
         if(details is { IsDisposed:false }) details.Repaint();
-        string Summary(string label,DeviceState? state,string? error)=>error is not null?$"{label} —":state is not null?$"{label} {state.Power.Percent}%"+(state.Power.Charging?"（充电中）":""):$"{label} 读取中";
+        string Summary(string label,DeviceState? state,string? error)=>error is not null?$"{label} —":state is not null?$"{label} {state.ValueText}"+(state.Power?.Charging==true?"（充电中）":""):$"{label} 读取中";
         var tooltip=Summary("鼠标",State,Error)+" · "+Summary("键盘",KeyboardState,KeyboardError)+"\n电池图标：鼠标电量";
         tray.Text=tooltip[..Math.Min(63,tooltip.Length)];
         bool live=Error is null && State is not null;

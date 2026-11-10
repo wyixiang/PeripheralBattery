@@ -59,15 +59,23 @@ internal sealed class DetailsWindow : GlassWindow
             var card=new C.StackPanel { Margin=new W.Thickness(0,0,0,14) }; stack.Children.Add(card);
             card.Children.Add(new C.TextBlock { Text=label+" · "+(state?.Name??fallback),FontSize=12,Foreground=p.Muted,TextTrimming=W.TextTrimming.CharacterEllipsis });
             var row=new C.StackPanel { Orientation=C.Orientation.Horizontal,Margin=new W.Thickness(0,4,0,6) }; card.Children.Add(row);
-            row.Children.Add(new C.TextBlock { Text=live?$"{power!.Percent}%":"—",FontSize=34,FontFamily=new M.FontFamily("Segoe UI"),FontWeight=W.FontWeights.SemiBold,Foreground=p.Text });
-            row.Children.Add(new C.TextBlock { Text=live?power!.Charging?"正在充电":"已连接":"等待连接",FontSize=12,Foreground=live?p.Accent:p.Muted,VerticalAlignment=W.VerticalAlignment.Bottom,Margin=new W.Thickness(12,0,0,8) });
-            card.Children.Add(new C.ProgressBar { Minimum=0,Maximum=100,Value=live?power!.Percent:0,Height=5,Foreground=power?.Percent<=20?Palette.Brush("#D57832"):p.Accent,Background=p.Stroke,BorderThickness=new W.Thickness(0) });
-            card.Children.Add(new C.TextBlock { Text=error??(context.Busy?"正在读取电量…":"通过 "+state?.Source+" 读取"),TextWrapping=W.TextWrapping.Wrap,FontSize=11,Foreground=error is null?p.Muted:Palette.Brush("#C47B31"),Margin=new W.Thickness(0,8,0,3) });
-            card.Children.Add(new C.TextBlock { Text=state is { } s?$"{(live?"更新于":"上次读取")} {s.UpdatedAt:HH:mm:ss}"+(!live?$" · {s.Power.Percent}%（非实时）":""):"尚未收到有效电量",FontSize=11,Foreground=p.Muted });
+            if(live && state!.IsWired)
+            {
+                var plug=UsbPowerIcon.Create(p.Text,40);
+                plug.Margin=new W.Thickness(0,2,0,3);
+                row.Children.Add(plug);
+            }
+            else
+                row.Children.Add(new C.TextBlock { Text=live?state!.ValueText:"—",FontSize=34,FontFamily=new M.FontFamily("Segoe UI"),FontWeight=W.FontWeights.SemiBold,Foreground=p.Text });
+            row.Children.Add(new C.TextBlock { Text=live?state!.ConnectionText:"等待连接",FontSize=12,Foreground=live?p.Accent:p.Muted,VerticalAlignment=W.VerticalAlignment.Bottom,Margin=new W.Thickness(12,0,0,8) });
+            if(state?.IsWired!=true)
+                card.Children.Add(new C.ProgressBar { Minimum=0,Maximum=100,Value=live?power?.Percent??0:0,Height=5,Foreground=power?.Percent<=20?Palette.Brush("#D57832"):p.Accent,Background=p.Stroke,BorderThickness=new W.Thickness(0) });
+            card.Children.Add(new C.TextBlock { Text=error??(live && state!.IsWired?"此型号由 USB 供电，无需电池":context.Busy?"正在读取设备状态…":state is null?"正在检测设备…":"通过 "+state.Source+" 读取"),TextWrapping=W.TextWrapping.Wrap,FontSize=11,Foreground=error is null?p.Muted:Palette.Brush("#C47B31"),Margin=new W.Thickness(0,8,0,3) });
+            card.Children.Add(new C.TextBlock { Text=state is { } s?$"{(live?"更新于":"上次读取")} {s.UpdatedAt:HH:mm:ss}"+(!live?$" · {s.ValueText}（非实时）":""):"尚未收到有效设备状态",FontSize=11,Foreground=p.Muted });
         }
         Device("鼠标","ROG OMNI 无线鼠标",context.State,context.Error);
         stack.Children.Add(new C.Border { Height=1,Background=p.Stroke,Margin=new W.Thickness(0,0,0,14) });
-        Device("键盘","CHERRY MX 10.1",context.KeyboardState,context.KeyboardError);
+        Device("键盘","CHERRY 键盘",context.KeyboardState,context.KeyboardError);
         stack.Children.Add(new C.TextBlock { Text="每 30 秒刷新 · 两台设备分别读取",FontSize=11,Foreground=p.Muted,Margin=new W.Thickness(0,0,0,10) });
         var buttons=new C.Grid(); buttons.ColumnDefinitions.Add(new C.ColumnDefinition()); buttons.ColumnDefinitions.Add(new C.ColumnDefinition()); stack.Children.Add(buttons);
         var refresh=Button(context.Busy?"读取中…":"刷新电量",p,()=>_=context.Refresh(),"\uE72C"); refresh.IsEnabled=!context.Busy; buttons.Children.Add(refresh);

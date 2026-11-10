@@ -4,10 +4,14 @@ internal static class CherryReader
 {
     internal static async Task<DeviceState> Read()
     {
-        // Match the verified MX 10.1 vendor collection; never open a keyboard
-        // input collection or send a query to an unrelated CHERRY device.
-        var devices=Hid.Enumerate(0x046a).Where(d=>d.ProductId==0x01ef && d.UsagePage==0xff1c && d.Usage==0x92 && d.InputLength==64 && d.OutputLength==64).ToArray();
-        if(devices.Length==0) throw new IOException("未检测到 CHERRY MX 10.1 电量接口");
+        var connected=Hid.Enumerate(0x046a);
+        var wired=connected.FirstOrDefault(d=>CherryDeviceSupport.IsWiredMx100(d.ProductId,d.UsagePage,d.Usage));
+        if(wired is not null)
+            return new("CHERRY MX 10.0 RGB",wired.ProductId,null,DateTimeOffset.Now,"USB 有线连接（无需电池）");
+
+        // Match only the verified MX 10.1 vendor collection.
+        var devices=connected.Where(d=>CherryDeviceSupport.IsMx101BatteryInterface(d.ProductId,d.UsagePage,d.Usage,d.InputLength,d.OutputLength)).ToArray();
+        if(devices.Length==0) throw new IOException("未检测到支持的 CHERRY 键盘（MX 10.0 / MX 10.1）");
         Exception? last=null;
         foreach(var device in devices)
         {
