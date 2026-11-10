@@ -47,4 +47,79 @@ Check(wired.IsWired && wired.Power is null && wired.ValueText=="有线" && wired
 var wireless=new DeviceState("CHERRY MX 10.1",0x01ef,new BatteryReading(78,true,0),DateTimeOffset.Now,"CHERRY HID 设备接口");
 Check(!wireless.IsWired && wireless.ValueText=="78%" && wireless.ConnectionText=="正在充电","wireless percentage and charging preserved");
 Check((wireless with { Power=new BatteryReading(0,false,0) }).ValueText=="0%","empty battery must not become wired");
-Console.WriteLine($"PASS: {checks} protocol and device-state checks");
+var journalFolder=Path.Combine(Path.GetTempPath(),"PeripheralBattery-check-"+Guid.NewGuid().ToString("N"));
+Directory.CreateDirectory(journalFolder);
+try
+{
+    var time=DateTimeOffset.Parse("2026-11-10T14:00:00+08:00");
+    RunSnapshot ReadSnapshot()=>System.Text.Json.JsonSerializer.Deserialize<RunSnapshot>(File.ReadAllText(Path.Combine(journalFolder,"session.json")))!;
+    string Events()=>File.ReadAllText(Path.Combine(journalFolder,"lifecycle.jsonl"));
+    var journal=new RunHistory(journalFolder,"test",()=>time);
+    Check(ReadSnapshot().Phase=="running" && journal.Previous is null,"first run records startup");
+    time=time.AddSeconds(30); journal.Heartbeat(true);
+    Check(ReadSnapshot().HeartbeatAt==time && ReadSnapshot().Busy,"heartbeat persists liveness even while read is busy");
+    journal.CardState("hidden-for-fullscreen");
+    long stateLength=new FileInfo(Path.Combine(journalFolder,"lifecycle.jsonl")).Length;
+    journal.CardState("hidden-for-fullscreen");
+    Check(ReadSnapshot().CardState=="hidden-for-fullscreen" && new FileInfo(Path.Combine(journalFolder,"lifecycle.jsonl")).Length==stateLength,"visibility cause persisted and duplicate events coalesced");
+    journal.RequestExit("command-line --exit"); journal.MarkCleanupComplete(); journal.ObserveExit(0); journal.Finish("fallback",0); journal.Finish("process-exit",0);
+    Check(ReadSnapshot().Phase=="exited" && ReadSnapshot().ExitReason=="command-line --exit" && ReadSnapshot().EndedAt==time,"explicit exit cause survives cleanup");
+    Check(Events().Split("process-ended").Length==2,"finish is idempotent");
+    var clean=new RunHistory(journalFolder,"test",()=>time);
+    Check(clean.Previous?.Phase=="exited" && !Events().Contains("previous-run-incomplete"),"clean previous exit is not falsely marked a crash");
+    clean.CardState("visible"); clean.Heartbeat(false);
+    // Simulate a hard kill: abandon the running journal without calling Finish.
+    var afterKill=new RunHistory(journalFolder,"test",()=>time.AddMinutes(1));
+    Check(afterKill.Previous?.Phase=="running" && afterKill.Previous.CardState=="visible" && Events().Contains("previous-run-incomplete"),"missing exit is detected without inventing a cause");
+    Check(File.Exists(Path.Combine(journalFolder,"previous-session.json")),"previous run snapshot is retained");
+    afterKill.Crash("wpf-dispatcher-unhandled-exception",new InvalidOperationException("simulated failure"));
+    afterKill.Finish("main-returned",0);
+    Check(ReadSnapshot().Phase=="crashed" && ReadSnapshot().ExitCode==1 && ReadSnapshot().LastException!.Contains("InvalidOperationException") && !ReadSnapshot().LastException!.Contains("simulated failure"),"fatal cause survives zero-code cleanup without copying exception messages");
+    var afterCrash=new RunHistory(journalFolder,"test",()=>time);
+    Check(afterCrash.Previous?.ExitReason=="wpf-dispatcher-unhandled-exception","next startup keeps exact prior crash cause");
+    File.WriteAllText(Path.Combine(journalFolder,"session.json"),"{corrupt");
+    var afterCorrupt=new RunHistory(journalFolder,"test",()=>time);
+    Check(ReadSnapshot().Phase=="running" && Events().Contains("cache-read-error"),"corrupt cache cannot block startup");
+    var bounded=new RunHistory(journalFolder,"test",()=>time,maxLogBytes:800);
+    for(int i=0;i<20;i++) bounded.Note("sample",new string('x',150));
+    Check(File.Exists(Path.Combine(journalFolder,"lifecycle.previous.jsonl")) && new FileInfo(Path.Combine(journalFolder,"lifecycle.jsonl")).Length<1500,"history rotates and keeps one previous file");
+    var blockedPath=Path.Combine(journalFolder,"not-a-directory"); File.WriteAllText(blockedPath,"blocked");
+    var unavailable=new RunHistory(blockedPath,"test",()=>time);
+    unavailable.Heartbeat(false); unavailable.Note("test"); unavailable.RequestExit("test"); unavailable.MarkCleanupComplete(); unavailable.ObserveExit(0); unavailable.Finish("fallback",0);
+    Check(unavailable.Snapshot.Phase=="exited","unwritable diagnostics never prevent startup or exit");
+    var unexpected=new RunHistory(journalFolder,"test",()=>time);
+    unexpected.MarkCleanupComplete(); unexpected.ObserveExit(0); unexpected.Finish("message-loop-returned",0);
+    Check(ReadSnapshot().Phase=="unexpected-exit","zero exit code and successful cleanup without a request are not a normal exit");
+    var afterUnexpected=new RunHistory(journalFolder,"test",()=>time);
+    Check(afterUnexpected.Previous?.Phase=="unexpected-exit" && Events().Contains("previous-run-abnormal"),"next startup classifies an unrequested exit as abnormal");
+    afterUnexpected.RequestExit("user-menu-exit"); afterUnexpected.Finish("process-exit",0);
+    Check(ReadSnapshot().Phase=="incomplete-exit" && ReadSnapshot().ExitRequestedAt==time && !ReadSnapshot().CleanupCompleted,"exit request without completed cleanup is distinct");
+    var pending=new RunHistory(journalFolder,"test",()=>time);
+    pending.RequestExit("windows-session-ending");
+    var interrupted=new RunHistory(journalFolder,"test",()=>time);
+    Check(interrupted.Previous?.Phase=="stopping" && interrupted.Previous.EndedAt is null,"requested but never finalized exit remains incomplete");
+    interrupted.RequestExit("user-menu-exit"); interrupted.MarkCleanupComplete(); interrupted.ObserveExit(1); interrupted.Finish("process-exit",0);
+    Check(ReadSnapshot().Phase=="unexpected-exit" && ReadSnapshot().ExitCode==1,"observed nonzero exit is not overwritten by zero-code cleanup");
+    Exception secret;
+    try { throw new InvalidOperationException("token=DO_NOT_LOG_PAYLOAD https://private.invalid/?key=DO_NOT_LOG_PAYLOAD",new IOException("DO_NOT_LOG_PAYLOAD")); }
+    catch(Exception error) { error.Data["credentials"]="DO_NOT_LOG_PAYLOAD"; secret=error; }
+    var safe=new RunHistory(journalFolder,"test",()=>time);
+    safe.Note("recoverable-task",error:secret);
+    Check(!File.ReadAllText(Path.Combine(journalFolder,"session.json")).Contains("DO_NOT_LOG_PAYLOAD") && !Events().Contains("DO_NOT_LOG_PAYLOAD"),"Note never writes exception messages, Data or URLs");
+    var diagnostic=ExceptionDiagnostics.Capture(secret);
+    Check(diagnostic.Type.EndsWith("InvalidOperationException") && diagnostic.HResult==secret.HResult && diagnostic.Stack.Any(s=>s.Contains("Main")) && diagnostic.Inner.Single().Type.EndsWith("IOException"),"diagnostics retain exception types, HResult, actual stack and inner exception identity");
+    safe.Crash("fatal",secret); string fatal=ReadSnapshot().LastException!;
+    safe.Note("late-cleanup",error:new Exception("another private message")); safe.MarkCleanupComplete(); safe.ObserveExit(0); safe.Finish("cleanup",0);
+    Check(ReadSnapshot().LastException==fatal && ReadSnapshot().Phase=="crashed" && ReadSnapshot().ExitCode==1,"cleanup and recoverable errors never overwrite fatal identity");
+    Check(!Events().Contains("DO_NOT_LOG_PAYLOAD"),"Crash shares the same redaction boundary");
+    var legacy=ReadSnapshot() with { LastException="DO_NOT_LOG_PAYLOAD",DiagnosticFormat=0 };
+    File.WriteAllText(Path.Combine(journalFolder,"session.json"),System.Text.Json.JsonSerializer.Serialize(legacy));
+    var upgraded=new RunHistory(journalFolder,"test",()=>time);
+    Check(upgraded.Previous?.LastException is null && !File.ReadAllText(Path.Combine(journalFolder,"previous-session.json")).Contains("DO_NOT_LOG_PAYLOAD"),"legacy raw exception text is not copied into new diagnostic records");
+    var legacyExited=upgraded.Snapshot with { Phase="exited",ExitCode=0,DiagnosticFormat=0,CleanupCompleted=false,ExitObserved=false,ExitRequestedAt=null };
+    File.WriteAllText(Path.Combine(journalFolder,"session.json"),System.Text.Json.JsonSerializer.Serialize(legacyExited));
+    _=new RunHistory(journalFolder,"test",()=>time);
+    Check(Events().Contains("previous-exit-unverified"),"an old exited label without completion evidence is not silently accepted as normal");
+}
+finally { foreach(var file in Directory.EnumerateFiles(journalFolder)) File.Delete(file); Directory.Delete(journalFolder); }
+Console.WriteLine($"PASS: {checks} protocol, device-state and lifecycle checks");

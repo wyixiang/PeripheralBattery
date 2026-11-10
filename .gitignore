@@ -18,8 +18,13 @@ work/
 *.jsonl
 diagnostic.txt
 startup-error.txt
+startup-error.txt.tmp
 preferences.json
 status.json
+session.json
+session.json.tmp
+previous-session.json
+previous-session.json.tmp
 
 # Credentials and signing material
 .env*

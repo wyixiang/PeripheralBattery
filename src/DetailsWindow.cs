@@ -34,6 +34,7 @@ internal sealed class DetailsWindow : GlassWindow
     }
     void Dismiss()
     {
+        Program.History?.Note("details-hidden","收起详情，后台继续运行");
         Hide();
         context.Dock.RestoreTopmost();
     }

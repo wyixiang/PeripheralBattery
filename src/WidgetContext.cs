@@ -13,7 +13,7 @@ internal sealed class WidgetContext : IDisposable
     internal DeviceState? KeyboardState;
     internal string? KeyboardError;
     internal bool Busy;
-    internal bool IsQuitting => disposed;
+    internal bool IsQuitting => stopping || disposed || !UiDispatch.Available(dispatcher);
     internal bool IsDark => Settings.Theme=="dark" || Settings.Theme=="system" && SystemTheme.IsDark;
     internal DockWindow Dock { get; }
     DetailsWindow? details;
@@ -21,10 +21,11 @@ internal sealed class WidgetContext : IDisposable
     readonly NotifyIcon tray;
     readonly TaskbarLayerWatcher layerWatcher;
     readonly DispatcherTimer timer=new() { Interval=TimeSpan.FromSeconds(1) };
+    readonly Dispatcher dispatcher=System.Windows.Application.Current.Dispatcher;
     readonly List<EventWaitHandle> events=new();
     readonly List<RegisteredWaitHandle> waits=new();
     int tick;
-    bool disposed;
+    volatile bool disposed,stopping;
     bool? lastTheme;
     int lastIcon=-1000;
     internal WidgetContext(bool inspectUi=false)
@@ -33,7 +34,7 @@ internal sealed class WidgetContext : IDisposable
         Dock=new(this);
         layerWatcher=new(System.Windows.Application.Current.Dispatcher,()=>
         {
-            if(disposed) return;
+            if(IsQuitting) return;
             try { Dock.DockToTaskbar(); } catch(Exception e) { Log(e); }
         });
         tray=new NotifyIcon { Visible=true,Text="外设电量 · 正在读取",Icon=TrayIconRenderer.Create(null,false,IsDark) };
@@ -41,7 +42,7 @@ internal sealed class WidgetContext : IDisposable
         foreach(var name in new[]{"Show","Menu","Exit"})
         {
             var signal=new EventWaitHandle(false,EventResetMode.AutoReset,@"Local\PeripheralBattery."+name); events.Add(signal);
-            waits.Add(ThreadPool.RegisterWaitForSingleObject(signal,(_,_)=>System.Windows.Application.Current.Dispatcher.BeginInvoke(new Action(()=> { if(disposed) return; if(name=="Exit") Quit(); else if(name=="Menu") ShowMenu(); else ShowDetails(); })),null,-1,false));
+            waits.Add(ThreadPool.RegisterWaitForSingleObject(signal,(_,_)=>PostUi(()=> { if(name=="Exit") Quit("command-line --exit"); else if(name=="Menu") ShowMenu(); else ShowDetails(); }),null,-1,false));
         }
         SystemEvents.DisplaySettingsChanged+=DisplaysChanged;
         SystemEvents.PowerModeChanged+=PowerChanged;
@@ -49,22 +50,26 @@ internal sealed class WidgetContext : IDisposable
         {
             try
             {
+                if(IsQuitting) return;
                 if(lastTheme!=IsDark) { lastTheme=IsDark; Repaint(); }
                 Dock.DockToTaskbar();
-                if(++tick%30==0) _=Refresh();
+                if(++tick%30==0) { Program.History?.Heartbeat(Busy); _=Refresh(); }
             }
             catch(Exception e) { Log(e); }
         };
         timer.Start(); Dock.Show(); Dock.DockToTaskbar(); _=Refresh();
     }
-    void DisplaysChanged(object? sender,EventArgs e) => System.Windows.Application.Current.Dispatcher.BeginInvoke(new Action(()=> { if(!disposed) { Dock.PrepareForReconnect(); Dock.DockToTaskbar(); } }));
+    void PostUi(Action action)=>UiDispatch.Post(dispatcher,()=>!IsQuitting,action);
+    void DisplaysChanged(object? sender,EventArgs e) => PostUi(()=> { Dock.PrepareForReconnect(); Dock.DockToTaskbar(); });
     void PowerChanged(object sender,PowerModeChangedEventArgs e)
     {
-        if(e.Mode==PowerModes.Resume) System.Windows.Application.Current.Dispatcher.BeginInvoke(new Action(()=> { if(!disposed) { Dock.PrepareForReconnect(); _=Refresh(); } }));
+        if(IsQuitting) return;
+        Program.History?.Note("power-mode",e.Mode.ToString());
+        if(e.Mode==PowerModes.Resume) PostUi(()=> { Dock.PrepareForReconnect(); _=Refresh(); });
     }
     internal async Task Refresh()
     {
-        if(Busy || disposed) return;
+        if(Busy || IsQuitting) return;
         Busy=true; Repaint();
         async Task ReadOne(bool keyboard)
         {
@@ -72,13 +77,13 @@ internal sealed class WidgetContext : IDisposable
             {
                 Func<Task<DeviceState>> reader=keyboard?CherryReader.Read:BatteryReader.Read;
                 var value=await Task.Run(reader);
-                if(disposed) return;
+                if(IsQuitting) return;
                 if(keyboard) { KeyboardState=value; KeyboardError=null; }
                 else { State=value; Error=null; }
             }
             catch(Exception e)
             {
-                if(disposed) return;
+                if(IsQuitting) return;
                 string error=e is OperationCanceledException?(keyboard?"键盘":"鼠标")+"休眠、离线或接口忙碌":e.Message;
                 if(keyboard) KeyboardError=error; else Error=error;
                 Log(e);
@@ -88,7 +93,7 @@ internal sealed class WidgetContext : IDisposable
         finally
         {
             Busy=false;
-            if(!disposed)
+            if(!IsQuitting)
             {
                 Repaint();
                 try
@@ -102,6 +107,7 @@ internal sealed class WidgetContext : IDisposable
     }
     internal void Repaint()
     {
+        if(IsQuitting) return;
         Dock.Repaint();
         if(details is { IsDisposed:false }) details.Repaint();
         string Summary(string label,DeviceState? state,string? error)=>error is not null?$"{label} —":state is not null?$"{label} {state.ValueText}"+(state.Power?.Charging==true?"（充电中）":""):$"{label} 读取中";
@@ -120,18 +126,22 @@ internal sealed class WidgetContext : IDisposable
     }
     internal void ShowDetails()
     {
-        if(details is { IsDisposed:false }) { details.Show(); details.WindowState=System.Windows.WindowState.Normal; details.Activate(); return; }
+        if(IsQuitting) return;
+        Program.History?.Note("details-opened");
+        if(details is { CanUse:true }) { details.Show(); details.WindowState=System.Windows.WindowState.Normal; details.Activate(); return; }
+        if(details is { IsClosing:true }) return;
         details=new(this); details.Show(); details.Activate();
     }
     internal void ShowMenu()
     {
+        if(IsQuitting || !Dock.CanRestore) return;
         if(menu?.IsOpen==true) { menu.IsOpen=false; return; }
         menu=WidgetMenu.Create(this);
         menu.PlacementTarget=Dock;
         menu.Placement=System.Windows.Controls.Primitives.PlacementMode.MousePoint;
         menu.IsOpen=true;
     }
-    internal void Change(Action<Preferences> change) { change(Settings); Settings.Save(); Repaint(); Dock.DockToTaskbar(); }
+    internal void Change(Action<Preferences> change) { if(IsQuitting) return; change(Settings); Settings.Save(); Repaint(); Dock.DockToTaskbar(); }
     internal static void OpenGearLink()=>Process.Start(new ProcessStartInfo("https://gearlink.asus.com/zh-cn") { UseShellExecute=true });
     internal bool Autostart
     {
@@ -147,7 +157,8 @@ internal sealed class WidgetContext : IDisposable
         }
         catch(Exception e) { System.Windows.MessageBox.Show("无法修改开机启动："+e.Message,"外设电量"); }
     }
-    internal void Quit() { if(disposed) return; Dispose(); System.Windows.Application.Current.Shutdown(); }
+    internal void BeginStopping()=>stopping=true;
+    internal void Quit(string reason="user-menu-exit") { if(IsQuitting) return; Program.History?.RequestExit(reason); BeginStopping(); Dispose(); System.Windows.Application.Current.Shutdown(); }
     internal static void Log(Exception e)
     {
         try
@@ -155,13 +166,14 @@ internal sealed class WidgetContext : IDisposable
             Directory.CreateDirectory(Preferences.Folder);
             var path=Path.Combine(Preferences.Folder,"error.log");
             if(File.Exists(path) && new FileInfo(path).Length>128*1024) File.WriteAllText(path,"");
-            File.AppendAllText(path,$"{DateTimeOffset.Now:u} {e.GetType().Name}: {e.Message}\n");
+            File.AppendAllText(path,$"{DateTimeOffset.Now:o} {ExceptionDiagnostics.Describe(e)}\n");
         }
         catch { }
     }
     public void Dispose()
     {
-        if(disposed) return; disposed=true;
+        if(disposed) return; BeginStopping(); disposed=true;
+        Program.History?.Note("disposing","清理计时器、托盘和窗口");
         timer.Stop();
         layerWatcher.Dispose();
         SystemEvents.DisplaySettingsChanged-=DisplaysChanged; SystemEvents.PowerModeChanged-=PowerChanged;
@@ -170,6 +182,7 @@ internal sealed class WidgetContext : IDisposable
         var icon=tray.Icon; tray.Visible=false; tray.Dispose(); icon?.Dispose();
         if(menu is not null) menu.IsOpen=false;
         if(details is { IsDisposed:false }) details.Close();
-        Dock.Close();
+        if(!Dock.IsDisposed) Dock.Close();
+        Program.History?.MarkCleanupComplete();
     }
 }

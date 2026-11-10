@@ -13,6 +13,7 @@ internal sealed class DockWindow : GlassWindow
     int startOffset;
     bool dragged;
     internal string? MonitorDevice { get; private set; }
+    internal bool CanRestore => !context.IsQuitting && CanUse;
     internal IntPtr Handle => new H.WindowInteropHelper(this).EnsureHandle();
     internal Rectangle Bounds => Native.GetWindowRect(Handle,out var r)?Rectangle.FromLTRB(r.Left,r.Top,r.Right,r.Bottom):Rectangle.Empty;
     internal DockWindow(WidgetContext context):base(context.IsDark)
@@ -38,6 +39,7 @@ internal sealed class DockWindow : GlassWindow
             if(dragged) context.Settings.Save(); else context.ShowDetails();
         };
         LostMouseCapture+=(_,_)=>press=null;
+        Closed+=(_,_)=>Program.History?.CardState(context.IsQuitting?"closed-during-exit":"closed-unexpectedly");
         MouseRightButtonUp+=(_,e)=> { Dispatcher.BeginInvoke(new Action(context.ShowMenu),System.Windows.Threading.DispatcherPriority.Input); e.Handled=true; };
         Repaint();
     }
@@ -104,20 +106,21 @@ internal sealed class DockWindow : GlassWindow
     }
     internal void DockToTaskbar()
     {
-        if(!context.Settings.Visible) { Hide(); return; }
+        if(!context.Settings.Visible) { Program.History?.CardState("hidden-by-user-setting"); Hide(); return; }
         var displays=DisplayCatalog.Read();
         var selected=monitor.Resolve(displays.Select(d=>new MonitorCandidate(d.DeviceName,d.Identity,d.Screen.Primary)).ToArray(),context.Settings.MonitorIdentity,context.Settings.MonitorDevice,DateTimeOffset.UtcNow);
-        if(selected is null) { Hide(); return; }
+        if(selected is null) { Program.History?.CardState("waiting-for-monitor"); Hide(); return; }
         var display=displays.First(d=>d.DeviceName==selected.DeviceName);
         MonitorDevice=display.DeviceName;
         if(context.Settings.MonitorIdentity is null && !string.IsNullOrEmpty(display.Identity))
         { context.Settings.MonitorIdentity=display.Identity; context.Settings.MonitorDevice=display.DeviceName; context.Settings.Save(); }
         var taskbar=Native.Taskbars().FirstOrDefault(h=>Screen.FromHandle(h).DeviceName==display.DeviceName);
-        if(taskbar==IntPtr.Zero || !Native.GetWindowRect(taskbar,out var r)) { Hide(); return; }
+        if(taskbar==IntPtr.Zero || !Native.GetWindowRect(taskbar,out var r)) { Program.History?.CardState("taskbar-not-found"); Hide(); return; }
         var screen=display.Screen.Bounds;
         var scale=Math.Max(96,Native.GetDpiForWindow(taskbar))/96.0;
         int width=(int)Math.Round(320*scale),height=Math.Min((int)Math.Round(40*scale),r.Bottom-r.Top-4);
-        if(height<20 || r.Top>=screen.Bottom-3 || r.Bottom<=screen.Top+3 || Native.IsFullscreenForeground(screen,Handle)) { Hide(); return; }
+        if(height<20 || r.Top>=screen.Bottom-3 || r.Bottom<=screen.Top+3) { Program.History?.CardState("taskbar-hidden-or-too-small"); Hide(); return; }
+        if(Native.IsFullscreenForeground(screen,Handle)) { Program.History?.CardState("hidden-for-fullscreen"); Hide(); return; }
         // Sit immediately to the left of the AI widget when it is on the same taskbar.
         int anchor=(int)Math.Round((r.Right-r.Left)*.16)-width-(int)Math.Round(8*scale);
         var ai=Native.FindWindow(null!,"Codex 任务栏额度");
@@ -126,5 +129,6 @@ internal sealed class DockWindow : GlassWindow
         int y=r.Top+(r.Bottom-r.Top-height)/2;
         Native.SetWindowPos(Handle,new IntPtr(-1),x,y,width,height,0x0250);
         if(!IsVisible) Show();
+        Program.History?.CardState("visible");
     }
 }

@@ -2,10 +2,24 @@ using System.Text.Json;
 namespace PeripheralBattery;
 internal static class Program
 {
+    internal static RunHistory? History { get; private set; }
+    static Mutex? instanceMutex;
     [STAThread] static void Main(string[] args)
     {
         try { Run(args); }
-        catch(Exception e) { File.WriteAllText(Path.Combine(AppContext.BaseDirectory,"startup-error.txt"),e.ToString()); }
+        catch(Exception e)
+        {
+            Environment.ExitCode=1;
+            History?.Crash("main-unhandled-exception",e);
+            try { Directory.CreateDirectory(Preferences.Folder); File.WriteAllText(Path.Combine(Preferences.Folder,"startup-error.txt"),ExceptionDiagnostics.Describe(e)); } catch { }
+        }
+        finally
+        {
+            History?.Finish("main-returned-without-exit-request",Environment.ExitCode);
+            // Finish the journal while still owning the single-instance lock.
+            // A quickly restarted process must not have its cache overwritten.
+            if(instanceMutex is not null) { instanceMutex.ReleaseMutex(); instanceMutex.Dispose(); }
+        }
     }
     static void Run(string[] args)
     {
@@ -37,14 +51,14 @@ internal static class Program
                                     var power=mouseSession.Query(report,0x12,7).GetAwaiter().GetResult(); lines.Add("POWER "+Convert.ToHexString(power));
                                 }
                             }
-                            catch(Exception e) { lines.Add(e.ToString()); }
+                            catch(Exception e) { lines.Add(ExceptionDiagnostics.Describe(e)); }
                         }
                     }
                 }
             }
-            catch(Exception e) { lines.Add(e.ToString()); }
+            catch(Exception e) { lines.Add(ExceptionDiagnostics.Describe(e)); }
             try { lines.Add("KEYBOARD "+JsonSerializer.Serialize(CherryReader.Read().GetAwaiter().GetResult())); }
-            catch(Exception e) { lines.Add("KEYBOARD "+e.GetType().Name+": "+e.Message); }
+            catch(Exception e) { lines.Add("KEYBOARD "+ExceptionDiagnostics.Describe(e)); }
             File.WriteAllLines(Path.Combine(AppContext.BaseDirectory,"diagnostic.txt"),lines);
             return;
         }
@@ -52,13 +66,37 @@ internal static class Program
         Application.EnableVisualStyles();
         var command=args.Contains("--exit")?"Exit":args.Contains("--menu")?"Menu":"Show";
         if(args.Contains("--exit")) { Signal(command); return; }
-        using var mutex=new Mutex(true,@"Local\PeripheralBattery.Personal",out var first);
-        if(!first) { Signal(command); return; }
+        var mutex=new Mutex(true,@"Local\PeripheralBattery.Personal",out var first);
+        if(!first) { mutex.Dispose(); Signal(command); return; }
+        instanceMutex=mutex;
+        History=new RunHistory(Preferences.Folder,typeof(Program).Assembly.GetName().Version?.ToString()??"unknown");
+        WidgetContext? context=null;
+        AppDomain.CurrentDomain.UnhandledException+=(_,e)=>
+        {
+            Environment.ExitCode=1;
+            context?.BeginStopping();
+            History.Crash("appdomain-unhandled-exception",e.ExceptionObject as Exception??new Exception());
+        };
+        AppDomain.CurrentDomain.ProcessExit+=(_,_)=>History.Finish("process-exit-without-request",Environment.ExitCode);
+        TaskScheduler.UnobservedTaskException+=(_,e)=>History.Note("unobserved-task-exception","后台任务异常（未直接终止进程）",e.Exception);
         var app=new System.Windows.Application { ShutdownMode=System.Windows.ShutdownMode.OnExplicitShutdown };
-        app.DispatcherUnhandledException+=(_,e)=>WidgetContext.Log(e.Exception);
-        using var context=new WidgetContext(args.Contains("--inspect-ui"));
-        if(args.Contains("--details")) app.Dispatcher.BeginInvoke(new Action(context.ShowDetails));
-        app.Run();
+        app.DispatcherUnhandledException+=(_,e)=> { context?.BeginStopping(); History.Crash("wpf-dispatcher-unhandled-exception",e.Exception); WidgetContext.Log(e.Exception); };
+        Application.ThreadException+=(_,e)=>
+        {
+            History.Crash("winforms-thread-exception",e.Exception);
+            context?.BeginStopping();
+            Environment.ExitCode=1;
+            UiDispatch.Post(app.Dispatcher,()=>true,()=>app.Shutdown(1));
+        };
+        app.SessionEnding+=(_,e)=> { History.RequestExit("windows-session-ending: "+e.ReasonSessionEnding); context?.BeginStopping(); };
+        app.Exit+=(_,e)=>History.ObserveExit(e.ApplicationExitCode);
+        using(context=new WidgetContext(args.Contains("--inspect-ui")))
+        {
+            if(args.Contains("--details")) UiDispatch.Post(app.Dispatcher,()=>!context.IsQuitting,context.ShowDetails);
+            History.Note("ready","任务栏卡片、托盘与刷新器已创建");
+            try { app.Run(); }
+            finally { context.BeginStopping(); }
+        }
     }
     static void Signal(string name)
     {

@@ -23,6 +23,7 @@ internal class GlassWindow : W.Window
     private bool _dark;
     internal bool IsDisposed { get; private set; }
     internal bool IsClosing { get; private set; }
+    internal bool CanUse => !IsDisposed && !IsClosing && UiDispatch.Available(Dispatcher);
     internal bool AcrylicApplied { get; private set; }
     internal readonly Palette Colors;
     internal readonly C.Border Surface;

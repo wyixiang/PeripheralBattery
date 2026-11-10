@@ -74,7 +74,7 @@ internal static class WidgetMenu
         foreach(var display in DisplayCatalog.Read()) Item(display.Label,()=>context.Change(s=> { s.MonitorIdentity=display.Identity; s.MonitorDevice=display.DeviceName; s.Offset=0; }),"\uE7F4",context.Dock.MonitorDevice==display.DeviceName,48);
         Line();
         Item("登录后自动启动",context.ToggleAutostart,"\uE7E8",context.Autostart);
-        Item("退出",context.Quit,"\uE8BB");
+        Item("退出",()=>context.Quit(),"\uE8BB");
         return menu;
     }
 }
