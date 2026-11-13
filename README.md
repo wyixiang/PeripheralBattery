@@ -21,6 +21,8 @@
 - 日常运行和打开详情均不显示独立的任务栏应用按钮；详情的最小化与关闭按钮收起窗口，单击卡片或托盘可重新打开。重复启动恢复已有详情，菜单“退出”结束后台进程。
 - 缓存本次及上次运行状态，记录退出来源、异常堆栈和卡片隐藏原因；日志自动轮转。下次启动能识别未留下退出记录的中断。
 
+- 从开发工具启动时先检查包身份与 Job；必要时独立启动，确认新进程已脱离宿主后再常驻，不依赖开发工具持续运行。
+
 任务栏卡片是对齐任务栏的独立覆盖窗口，不会自动给其他任务栏按钮腾出空间。可拖到空白区域，再锁定位置。目标屏全屏或任务栏自动隐藏时，卡片按对应状态隐藏。
 
 ## 已验证设备
@@ -60,6 +62,11 @@ dotnet run --project tests/ProtocolChecks.csproj -c Release
 # 16 项隔离 STA/WPF 窗口生命周期检查（Windows）。
 # 使用生产窗口与调度代码、内存配置，不访问设备或运行实例的 IPC/设置。
 dotnet run --project tests/windows/WindowChecks.csproj -c Release
+
+# 16 项独立启动及真实宿主退出检查。
+# 构建后直接运行 EXE，避免 dotnet run 自身的 MSBuild Job 干扰隔离测试。
+dotnet build tests/startup/StartupChecks.csproj -c Release
+.\tests\startup\bin\Release\net9.0-windows\StartupChecks.exe
 
 # 发布到 dist/。更新前请先通过菜单退出正在运行的版本。
 .\build.ps1

@@ -6,7 +6,12 @@ internal static class Program
     static Mutex? instanceMutex;
     [STAThread] static void Main(string[] args)
     {
-        try { Run(args); }
+        try
+        {
+            // Command helpers are short-lived and must not own resident state.
+            if(!args.Contains("--exit") && !args.Contains("--diagnose") && LaunchIsolation.TryRelaunch(args)) return;
+            Run(args);
+        }
         catch(Exception e)
         {
             Environment.ExitCode=1;
