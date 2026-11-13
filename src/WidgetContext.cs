@@ -129,7 +129,7 @@ internal sealed class WidgetContext : IDisposable
     {
         if(IsQuitting) return;
         Program.History?.Note("details-opened");
-        if(details is { CanUse:true }) { details.Show(); details.WindowState=System.Windows.WindowState.Normal; details.Activate(); return; }
+        if(details is { CanUse:true }) { details.WindowState=System.Windows.WindowState.Normal; details.Show(); details.Activate(); return; }
         if(details is { IsClosing:true }) return;
         details=new(this); details.Show(); details.Activate();
     }

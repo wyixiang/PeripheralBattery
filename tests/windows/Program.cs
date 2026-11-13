@@ -27,13 +27,13 @@ internal static class Program
         var wait=System.Diagnostics.Stopwatch.StartNew();
         while(!asyncComplete && wait.Elapsed<TimeSpan.FromSeconds(3)) { Pump(); Thread.Sleep(5); }
         Check(asyncComplete && wpfContext && before==after && before==Environment.CurrentManagedThreadId,"initial queued async refresh captures WPF context before the main Run loop");
-        var context=new WidgetContext();
+        var context=new WidgetContext { InspectUi=true };
         var dock=new DockWindow(context) { Left=-20000,Top=-20000 };
         context.Dock=dock;
         Check(dock.Handle==IntPtr.Zero,"reading Handle never creates a native window");
         dock.Show();
         var originalHandle=dock.Handle;
-        Check(originalHandle!=IntPtr.Zero && !dock.ShowInTaskbar,"card has a handle but no independent taskbar button");
+        Check(originalHandle!=IntPtr.Zero && !dock.ShowInTaskbar,"card has a handle but no independent taskbar button even in inspect mode");
         bool blockedDuringClosing=false;
         dock.Closing+=(_,e)=> { blockedDuringClosing=!dock.CanRestore; e.Cancel=false; };
         dock.Close();
@@ -43,7 +43,7 @@ internal static class Program
         dock.Show(); Escape(dock);
         Check(!dock.IsDisposed && dock.IsVisible,"Esc does not destroy the persistent card");
         var details=new DetailsWindow(context) { Left=-20000,Top=-20000,WindowStartupLocation=W.WindowStartupLocation.Manual };
-        for(int i=0;i<3;i++) { details.Show(); details.Close(); Check(!details.IsDisposed && !details.IsClosing && !details.IsVisible,"details Close dismisses without destroying window #"+i); }
+        for(int i=0;i<3;i++) { details.Show(); if(i==1) details.WindowState=W.WindowState.Minimized; else details.Close(); Check(!details.ShowInTaskbar && !details.IsDisposed && !details.IsClosing && !details.IsVisible && details.WindowState==W.WindowState.Normal,"details Close/system minimize dismisses without destroying window or showing taskbar button #"+i); }
         details.Show(); var escaped=Escape(details);
         Check(escaped.Handled && !details.IsDisposed && !details.IsVisible && !dock.IsDisposed,"details Esc dismisses only the floating window");
         int late=0;

@@ -13,7 +13,7 @@ internal sealed class TestPreferences
 internal sealed class WidgetContext
 {
     internal bool IsDark=>false;
-    internal bool InspectUi=>false;
+    internal bool InspectUi { get; set; }
     internal bool IsQuitting;
     internal bool Busy=>false;
     internal TestPreferences Settings=new();

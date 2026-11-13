@@ -7,8 +7,9 @@ internal sealed class DetailsWindow : GlassWindow
     readonly WidgetContext context;
     internal DetailsWindow(WidgetContext context):base(context.IsDark)
     {
-        this.context=context; Title="外设电量详情"; Width=360; SizeToContent=W.SizeToContent.Height; ShowInTaskbar=context.InspectUi;
+        this.context=context; Title="外设电量详情"; Width=360; SizeToContent=W.SizeToContent.Height; ShowInTaskbar=false;
         WindowStartupLocation=W.WindowStartupLocation.CenterScreen;
+        StateChanged+=(_,_)=> { if(WindowState==W.WindowState.Minimized && !context.IsQuitting && CanUse) Dismiss(); };
         MouseLeftButtonDown+=(_,e)=> { if(e.OriginalSource is C.TextBlock or C.Border) try { DragMove(); } catch(InvalidOperationException) { } };
         Deactivated+=(_,_)=>UiDispatch.Post(Dispatcher,()=>!context.IsQuitting && CanUse,()=>
         {
@@ -39,6 +40,7 @@ internal sealed class DetailsWindow : GlassWindow
         if(context.IsQuitting || !CanUse) return;
         Program.History?.Note("details-hidden","收起详情，后台继续运行");
         Hide();
+        if(WindowState==W.WindowState.Minimized) WindowState=W.WindowState.Normal;
         context.Dock.RestoreTopmost();
     }
     internal void Repaint()

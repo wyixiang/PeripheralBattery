@@ -20,7 +20,7 @@ internal sealed class DockWindow : GlassWindow
     internal DockWindow(WidgetContext context):base(context.IsDark)
     {
         this.context=context;
-        Title="外设电量"; Width=320; Height=40; ShowActivated=false; ShowInTaskbar=context.InspectUi;
+        Title="外设电量"; Width=320; Height=40; ShowActivated=false; ShowInTaskbar=false;
         Surface.CornerRadius=new W.CornerRadius(9);
         SourceInitialized+=(_,_)=>Native.SetWindowLongPtr(Handle,-20,new IntPtr(Native.GetWindowLongPtr(Handle,-20).ToInt64()|0x08000000L));
         MouseLeftButtonDown+=(_,e)=> { press=System.Windows.Forms.Cursor.Position; startOffset=context.Settings.Offset; dragged=false; CaptureMouse(); e.Handled=true; };
