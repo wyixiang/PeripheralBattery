@@ -103,7 +103,22 @@ internal static class StartupChecks
                 }
                 finally { File.WriteAllText(marker+".stop","stop"); if(!child.WaitForExit(5000)) throw new Exception("Test resident did not stop"); }
             }
-            Console.WriteLine($"PASS: {checks} startup isolation checks");
+            var source=Path.Combine(directory,"package-cache"); var destination=Path.Combine(directory,"canonical"); Directory.CreateDirectory(source);
+            const string original="{\"Offset\":-3051,\"Locked\":false,\"Theme\":\"system\"}";
+            File.WriteAllText(Path.Combine(source,"preferences.json"),original);
+            File.WriteAllText(Path.Combine(source,"session.json"),"{\"RunId\":\"old-evidence\"}");
+            File.WriteAllText(Path.Combine(source,"lifecycle.jsonl"),"old evidence");
+            var imported=AppDataPaths.Import(destination,new[]{source});
+            Check(imported.Count==3 && File.ReadAllText(Path.Combine(destination,"preferences.json"))==original,"settings and old session evidence are imported without rewriting contents");
+            File.WriteAllText(Path.Combine(source,"preferences.json"),"{\"Offset\":999}");
+            Check(AppDataPaths.Import(destination,new[]{source}).Count==0 && File.ReadAllText(Path.Combine(destination,"preferences.json"))==original,"existing canonical settings and logs are never overwritten");
+            Check(File.Exists(Path.Combine(source,"session.json")),"original packaged evidence is retained");
+            var bad=Path.Combine(directory,"corrupt"); Directory.CreateDirectory(bad); File.WriteAllText(Path.Combine(bad,"preferences.json"),"not json");
+            Check(AppDataPaths.Import(Path.Combine(directory,"new"),new[]{bad}).Single().Result=="skipped-unreadable","corrupt package settings do not prevent startup");
+            var location=AppDataPaths.Inspect(destination);
+            Check(string.Equals(location.ActualDirectory,Path.GetFullPath(destination),StringComparison.OrdinalIgnoreCase),"diagnostics resolve actual opened file location");
+            Check(!AppDataPaths.LocalRoot.Contains("\\Packages\\",StringComparison.OrdinalIgnoreCase),"canonical LocalAppData is outside package cache");
+            Console.WriteLine($"PASS: {checks} startup isolation and migration checks");
             return 0;
         }
         finally

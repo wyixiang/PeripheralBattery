@@ -74,7 +74,10 @@ internal static class Program
         var mutex=new Mutex(true,@"Local\PeripheralBattery.Personal",out var first);
         if(!first) { mutex.Dispose(); Signal(command); return; }
         instanceMutex=mutex;
+        var migrations=AppDataPaths.Import(Preferences.Folder,new[]{AppDataPaths.PackagedFolder,Path.Combine(AppDataPaths.LocalRoot,"MouseBattery")});
         History=new RunHistory(Preferences.Folder,typeof(Program).Assembly.GetName().Version?.ToString()??"unknown");
+        History.RecordStartup(LaunchIsolation.Current,AppDataPaths.Inspect(Preferences.Folder));
+        foreach(var migration in migrations) History.Note("data-migration",migration.File+": "+migration.Result);
         WidgetContext? context=null;
         AppDomain.CurrentDomain.UnhandledException+=(_,e)=>
         {

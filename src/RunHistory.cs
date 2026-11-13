@@ -5,7 +5,8 @@ namespace PeripheralBattery;
 internal sealed record RunSnapshot(string RunId,int ProcessId,string Version,DateTimeOffset StartedAt,
     DateTimeOffset HeartbeatAt,string Phase,string? ExitReason=null,DateTimeOffset? EndedAt=null,
     int? ExitCode=null,string? LastException=null,string? CardState=null,bool Busy=false,
-    DateTimeOffset? ExitRequestedAt=null,bool CleanupCompleted=false,bool ExitObserved=false,int DiagnosticFormat=0);
+    DateTimeOffset? ExitRequestedAt=null,bool CleanupCompleted=false,bool ExitObserved=false,int DiagnosticFormat=0,
+    LaunchEnvironment? Launch=null,DataLocation? DataLocation=null);
 
 // Best-effort diagnostics must never bring down the widget. Only the primary
 // instance owns this journal; --exit/--details helper processes do not touch it.
@@ -56,6 +57,15 @@ internal sealed class RunHistory
             var diagnostic=error is null?null:ExceptionDiagnostics.Capture(error);
             if(diagnostic is not null && snapshot.Phase!="crashed") { snapshot=snapshot with { LastException=JsonSerializer.Serialize(diagnostic) }; Save(); }
             Append(eventName,detail,diagnostic);
+        }
+    }
+    internal void RecordStartup(LaunchEnvironment launch,DataLocation location)
+    {
+        lock(gate)
+        {
+            if(finished) return;
+            snapshot=snapshot with { Launch=launch,DataLocation=location }; Save();
+            Append("startup-environment",data:new { launch,location });
         }
     }
     internal void Heartbeat(bool busy)

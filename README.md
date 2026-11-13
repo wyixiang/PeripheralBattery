@@ -63,7 +63,7 @@ dotnet run --project tests/ProtocolChecks.csproj -c Release
 # 使用生产窗口与调度代码、内存配置，不访问设备或运行实例的 IPC/设置。
 dotnet run --project tests/windows/WindowChecks.csproj -c Release
 
-# 16 项独立启动及真实宿主退出检查。
+# 22 项独立启动、真实宿主退出和数据迁移检查。
 # 构建后直接运行 EXE，避免 dotnet run 自身的 MSBuild Job 干扰隔离测试。
 dotnet build tests/startup/StartupChecks.csproj -c Release
 .\tests\startup\bin\Release\net9.0-windows\StartupChecks.exe
@@ -102,6 +102,8 @@ artifacts/、work/     本地构建、备份和排查文件，已排除 Git
 | `startup-error.txt` | 主线程未处理异常的备用记录 |
 
 旧版 MouseBattery 的个人设置会在首次启动时导入。更换程序位置后，如已启用登录启动，请在新位置关闭、重新开启一次该选项。
+
+1.3.5 起明确使用非包重定向的用户 LocalAppData。旧 Codex 包缓存中的外设设置、会话与日志仅在对应目标文件缺失时复制导入，原文件保留，不改动开机启动。`session.json` 的 `Launch` 记录真实包身份与 Job 状态，`DataLocation` 同时记录请求目录及通过实际打开文件确认的物理目录。
 
 成功状态中的 `Power: null` 和 `IsWired: true` 表示已识别的 USB 供电设备，无电池；读取失败仍由各自的错误字段表示，不会转换为 0%。
 

@@ -55,7 +55,8 @@ try
     RunSnapshot ReadSnapshot()=>System.Text.Json.JsonSerializer.Deserialize<RunSnapshot>(File.ReadAllText(Path.Combine(journalFolder,"session.json")))!;
     string Events()=>File.ReadAllText(Path.Combine(journalFolder,"lifecycle.jsonl"));
     var journal=new RunHistory(journalFolder,"test",()=>time);
-    Check(ReadSnapshot().Phase=="running" && journal.Previous is null,"first run records startup");
+    journal.RecordStartup(new LaunchEnvironment(null,false,null),new DataLocation(journalFolder,journalFolder));
+    Check(ReadSnapshot().Phase=="running" && journal.Previous is null && ReadSnapshot().Launch?.InJob==false && ReadSnapshot().DataLocation?.ActualDirectory==journalFolder,"first run records startup with actual launch and storage diagnostics");
     time=time.AddSeconds(30); journal.Heartbeat(true);
     Check(ReadSnapshot().HeartbeatAt==time && ReadSnapshot().Busy,"heartbeat persists liveness even while read is busy");
     journal.CardState("hidden-for-fullscreen");

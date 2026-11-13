@@ -8,7 +8,7 @@ internal sealed class Preferences
     public string Theme { get; set; }="system";
     public string? MonitorIdentity { get; set; }
     public string? MonitorDevice { get; set; }
-    internal static string Folder => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"PeripheralBattery");
+    internal static string Folder => AppDataPaths.Folder;
     internal static string FilePath => Path.Combine(Folder,"preferences.json");
     internal static Preferences Load()
     {
