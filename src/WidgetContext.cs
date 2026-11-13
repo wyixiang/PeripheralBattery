@@ -57,7 +57,7 @@ internal sealed class WidgetContext : IDisposable
             }
             catch(Exception e) { Log(e); }
         };
-        timer.Start(); Dock.Show(); Dock.DockToTaskbar(); _=Refresh();
+        timer.Start(); Dock.Show(); Dock.DockToTaskbar(); PostUi(()=>_=Refresh());
     }
     void PostUi(Action action)=>UiDispatch.Post(dispatcher,()=>!IsQuitting,action);
     void DisplaysChanged(object? sender,EventArgs e) => PostUi(()=> { Dock.PrepareForReconnect(); Dock.DockToTaskbar(); });
@@ -69,6 +69,7 @@ internal sealed class WidgetContext : IDisposable
     }
     internal async Task Refresh()
     {
+        if(!dispatcher.CheckAccess() || SynchronizationContext.Current is not DispatcherSynchronizationContext) { PostUi(()=>_=Refresh()); return; }
         if(Busy || IsQuitting) return;
         Busy=true; Repaint();
         async Task ReadOne(bool keyboard)

@@ -59,7 +59,7 @@
 # 61 项协议、设备状态及运行日志检查，不访问硬件。
 dotnet run --project tests/ProtocolChecks.csproj -c Release
 
-# 16 项隔离 STA/WPF 窗口生命周期检查（Windows）。
+# 17 项隔离 STA/WPF 窗口生命周期检查（Windows）。
 # 使用生产窗口与调度代码、内存配置，不访问设备或运行实例的 IPC/设置。
 dotnet run --project tests/windows/WindowChecks.csproj -c Release
 

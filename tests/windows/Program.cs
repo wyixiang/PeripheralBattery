@@ -22,6 +22,11 @@ internal static class Program
     [STAThread] static void Main()
     {
         var app=new W.Application { ShutdownMode=W.ShutdownMode.OnExplicitShutdown };
+        bool asyncComplete=false,wpfContext=false; int before=0,after=0;
+        UiDispatch.Post(app.Dispatcher,()=>true,async ()=> { before=Environment.CurrentManagedThreadId; wpfContext=SynchronizationContext.Current is DispatcherSynchronizationContext; await Task.Run(()=>Thread.Sleep(20)); after=Environment.CurrentManagedThreadId; asyncComplete=true; });
+        var wait=System.Diagnostics.Stopwatch.StartNew();
+        while(!asyncComplete && wait.Elapsed<TimeSpan.FromSeconds(3)) { Pump(); Thread.Sleep(5); }
+        Check(asyncComplete && wpfContext && before==after && before==Environment.CurrentManagedThreadId,"initial queued async refresh captures WPF context before the main Run loop");
         var context=new WidgetContext();
         var dock=new DockWindow(context) { Left=-20000,Top=-20000 };
         context.Dock=dock;
